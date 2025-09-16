@@ -1,6 +1,6 @@
 // Serviços para integração com Supabase
 import { supabase } from '@/integrations/supabase/client';
-import { Product, Condiment, ProductCondimentAssociation, Order, OrderProduct } from '@/types';
+import { Product, Condiment, ProductCondimentAssociation, Order, OrderProduct, CartItem, SelectedCondiment } from '@/types';
 
 // Função utilitária para gerar código único do carrinho
 export function generateCartCode(): string {
@@ -223,6 +223,115 @@ export async function fetchOrderByCartCode(cartCode: string): Promise<OrderProdu
     }));
   } catch (error) {
     console.error('Erro ao buscar pedido por código:', error);
+    return [];
+  }
+}
+
+// Função para reconstruir carrinho a partir de um pedido
+export async function reconstructCartFromOrder(cartCode: string): Promise<CartItem[]> {
+  try {
+    // Buscar produtos vendidos
+    const { data: soldProducts, error: soldError } = await supabase
+      .from('produtos_vendidos')
+      .select('*')
+      .eq('carrinho', cartCode);
+
+    if (soldError || !soldProducts) {
+      console.error('Error fetching sold products:', soldError);
+      return [];
+    }
+
+    // Buscar dados dos produtos
+    const productIds = [...new Set(soldProducts.map(item => item.id_produto))];
+    const { data: products, error: productsError } = await supabase
+      .from('produtos')
+      .select('*')
+      .in('id_produto', productIds);
+
+    if (productsError || !products) {
+      console.error('Error fetching products:', productsError);
+      return [];
+    }
+
+    // Buscar dados dos condimentos
+    const condimentIds = soldProducts
+      .map(item => item.id_condimento)
+      .filter(id => id !== null && id !== '' && id !== '0');
+    
+    let condiments: any[] = [];
+    if (condimentIds.length > 0) {
+      const { data: condimentsData, error: condimentsError } = await supabase
+        .from('condimentos')
+        .select('*')
+        .in('id_condimento', condimentIds);
+
+      if (condimentsError) {
+        console.error('Error fetching condiments:', condimentsError);
+      } else {
+        condiments = condimentsData || [];
+      }
+    }
+
+    // Agrupar por id_produto para reconstruir itens do carrinho
+    const cartItems: CartItem[] = [];
+    const productGroups = new Map<string, any[]>();
+
+    // Agrupar produtos vendidos por id_produto
+    soldProducts.forEach(item => {
+      if (!productGroups.has(item.id_produto)) {
+        productGroups.set(item.id_produto, []);
+      }
+      productGroups.get(item.id_produto)!.push(item);
+    });
+
+    // Reconstruir cada item do carrinho
+    productGroups.forEach((items, productId) => {
+      const product = products.find(p => p.id_produto === productId);
+      if (!product) return;
+
+      // Encontrar produtos base (sem condimento ou condimento "0") para determinar quantidade
+      const baseItems = items.filter(item => !item.id_condimento || item.id_condimento === '0' || item.id_condimento === '');
+      const quantity = baseItems.length || 1;
+
+      // Encontrar condimentos associados
+      const condimentItems = items.filter(item => item.id_condimento && item.id_condimento !== '0' && item.id_condimento !== '');
+      const selectedCondiments: SelectedCondiment[] = condimentItems.map(item => {
+        const condiment = condiments.find(c => c.id_condimento === item.id_condimento);
+        return {
+          id_condimento: item.id_condimento,
+          nome_condimento: condiment?.nome_condimento || 'Condimento não encontrado',
+          valor_adicional: condiment?.valor_adicional || 0,
+          tipo_condimento: condiment?.tipo_condimento || 'Adicionais'
+        };
+      });
+
+      // Calcular preço total
+      const basePrice = Number(product.valor);
+      const condimentsPrice = selectedCondiments.reduce((sum, c) => sum + Number(c.valor_adicional), 0);
+      const totalPrice = (basePrice + condimentsPrice) * quantity;
+
+      const cartItem: CartItem = {
+        id: generateCartCode(), // Gerar novo ID único
+        product: {
+          id: product.id,
+          id_produto: product.id_produto,
+          titulo: product.titulo,
+          descricao: product.descricao || '',
+          valor: basePrice,
+          categoria: product.categoria,
+          link_imagem: product.link_imagem || ''
+        },
+        quantity,
+        selectedCondiments,
+        totalPrice
+      };
+
+      cartItems.push(cartItem);
+    });
+
+    return cartItems;
+  } catch (error) {
+    console.error('Error reconstructing cart from order:', error);
     return [];
   }
 }

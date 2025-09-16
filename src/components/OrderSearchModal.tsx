@@ -5,14 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { X, Search, Printer, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { fetchOrderByCartCode, updateOrderApproval } from '@/services/supabase';
+import { X, Search, Printer, CheckCircle, XCircle, Loader2, Edit, ShoppingCart } from 'lucide-react';
+import { fetchOrderByCartCode, updateOrderApproval, reconstructCartFromOrder } from '@/services/supabase';
 import { OrderProduct } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useCart } from '@/contexts/CartContext';
+import { ThermalPrintTemplate } from './ThermalPrintTemplate';
 
 interface OrderSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onEditOrder?: () => void;
 }
 
 interface GroupedOrderItem {
@@ -31,13 +34,15 @@ interface GroupedOrderItem {
   totalPrice: number;
 }
 
-export function OrderSearchModal({ isOpen, onClose }: OrderSearchModalProps) {
+export function OrderSearchModal({ isOpen, onClose, onEditOrder }: OrderSearchModalProps) {
   const [searchCode, setSearchCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [orderData, setOrderData] = useState<OrderProduct[]>([]);
   const [customerData, setCustomerData] = useState<OrderProduct | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const { toast } = useToast();
+  const { loadCart } = useCart();
 
   const formatPrice = (price: number) => {
     return `R$ ${price.toFixed(2).replace('.', ',')}`;
@@ -116,31 +121,98 @@ export function OrderSearchModal({ isOpen, onClose }: OrderSearchModalProps) {
     }
   };
 
+  const handleEditOrder = async () => {
+    if (!customerData) return;
+
+    setLoading(true);
+    try {
+      const cartItems = await reconstructCartFromOrder(customerData.carrinho);
+      if (cartItems.length === 0) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível reconstruir o carrinho.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      loadCart(cartItems);
+      toast({
+        title: 'Carrinho carregado!',
+        description: 'O pedido foi carregado no carrinho para edição.',
+      });
+
+      handleClose();
+      onEditOrder?.();
+    } catch (error) {
+      console.error('Erro ao carregar pedido no carrinho:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar o pedido.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateNote = () => {
+    if (!customerData) return;
+    setShowPrintPreview(true);
+  };
+
+  const handlePrintNote = async () => {
+    if (!customerData) return;
+
+    setLoading(true);
+    try {
+      await updateOrderApproval(customerData.carrinho, 'sim');
+      
+      toast({
+        title: 'Nota gerada!',
+        description: 'Pedido aprovado e nota fiscal emitida.',
+      });
+
+      // Imprimir a nota
+      window.print();
+      
+      setShowPrintPreview(false);
+      handleClose();
+    } catch (error) {
+      console.error('Erro ao gerar nota:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar a nota fiscal.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApproval = async (approved: 'sim' | 'não') => {
     if (!customerData) return;
+
+    if (approved === 'sim') {
+      handleGenerateNote();
+      return;
+    }
 
     setLoading(true);
     try {
       await updateOrderApproval(customerData.carrinho, approved);
       
       toast({
-        title: approved === 'sim' ? 'Pedido aprovado!' : 'Pedido cancelado!',
-        description: approved === 'sim' 
-          ? 'Nota fiscal emitida com sucesso.' 
-          : 'O pedido foi cancelado.',
+        title: 'Pedido cancelado!',
+        description: 'O pedido foi cancelado.',
       });
-
-      if (approved === 'sim') {
-        // Simular impressão da nota
-        window.print();
-      }
 
       handleClose();
     } catch (error) {
-      console.error('Erro ao atualizar aprovação:', error);
+      console.error('Erro ao cancelar pedido:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível atualizar o status do pedido.',
+        description: 'Não foi possível cancelar o pedido.',
         variant: 'destructive',
       });
     } finally {
@@ -153,6 +225,7 @@ export function OrderSearchModal({ isOpen, onClose }: OrderSearchModalProps) {
     setOrderData([]);
     setCustomerData(null);
     setShowResults(false);
+    setShowPrintPreview(false);
     onClose();
   };
 
@@ -160,6 +233,60 @@ export function OrderSearchModal({ isOpen, onClose }: OrderSearchModalProps) {
   const totalOrder = groupedItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
   if (!isOpen) return null;
+
+  if (showPrintPreview && customerData) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex justify-between items-center">
+              <DialogTitle>Visualizar Nota Fiscal</DialogTitle>
+              <Button variant="ghost" size="sm" onClick={handleClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <ThermalPrintTemplate
+              orderData={orderData}
+              customerData={customerData}
+              cartCode={customerData.carrinho}
+              totalOrder={totalOrder}
+            />
+
+            <div className="flex gap-3 no-print">
+              <Button
+                variant="outline"
+                onClick={() => setShowPrintPreview(false)}
+                className="flex-1"
+              >
+                Voltar
+              </Button>
+              
+              <Button
+                onClick={handlePrintNote}
+                disabled={loading}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Gerar Nota
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -273,33 +400,78 @@ export function OrderSearchModal({ isOpen, onClose }: OrderSearchModalProps) {
               </CardContent>
             </Card>
 
+            {/* Status do Pedido */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Status do Pedido</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Código: {customerData?.carrinho}
+                    </p>
+                  </div>
+                  <Badge variant={customerData?.aprovado === 'sim' ? 'default' : 'secondary'}>
+                    {customerData?.aprovado === 'sim' ? 'Aprovado' : 'Pendente'}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Ações do Atendente */}
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => handleApproval('não')}
-                disabled={loading}
-                className="flex-1 text-destructive hover:bg-destructive/10"
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Cancelar Pedido
-              </Button>
-              
-              <Button
-                onClick={() => handleApproval('sim')}
-                disabled={loading}
-                className="flex-1 gradient-primary text-primary-foreground"
-              >
-                {loading ? (
-                  <>Processando...</>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Confirmar e Emitir Nota
-                  </>
-                )}
-              </Button>
-            </div>
+            {customerData?.aprovado !== 'sim' ? (
+              <div className="space-y-3">
+                <Button
+                  onClick={handleEditOrder}
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Carregando...
+                    </>
+                  ) : (
+                    <>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar Pedido
+                    </>
+                  )}
+                </Button>
+                
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleApproval('não')}
+                    disabled={loading}
+                    className="flex-1 text-destructive hover:bg-destructive/10"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Cancelar Pedido
+                  </Button>
+                  
+                  <Button
+                    onClick={() => handleApproval('sim')}
+                    disabled={loading}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {loading ? (
+                      <>Processando...</>
+                    ) : (
+                      <>
+                        <Printer className="h-4 w-4 mr-2" />
+                        Gerar Nota
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                <p className="text-green-800 font-medium">Pedido já aprovado</p>
+                <p className="text-green-600 text-sm">Nota fiscal já foi emitida</p>
+              </div>
+            )}
 
             <div className="text-center">
               <Button

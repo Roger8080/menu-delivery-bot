@@ -76,9 +76,13 @@ const Index = () => {
     setShowCheckout(true);
   };
 
+  const handleEditOrder = () => {
+    setShowOrderSearch(false);
+    setShowCart(true);
+  };
+
   const handleOrderSearch = (code: string) => {
     setShowCart(false);
-    // Aqui você implementaria a busca do pedido e reconstrução do carrinho
     toast({
       title: 'Busca de pedido',
       description: `Buscando pedido com código: ${code}`,
@@ -158,6 +162,7 @@ const Index = () => {
         <OrderSearchModal
           isOpen={showOrderSearch}
           onClose={() => setShowOrderSearch(false)}
+          onEditOrder={handleEditOrder}
         />
       </div>
     </CartProvider>
