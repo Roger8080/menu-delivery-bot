@@ -11,12 +11,11 @@ interface CartModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCheckout: () => void;
-  onSearchOrder: (code: string) => void;
+  onSearchOrder: () => void;
 }
 
 export function CartModal({ isOpen, onClose, onCheckout, onSearchOrder }: CartModalProps) {
   const { state, updateQuantity, removeItem, clearCart } = useCart();
-  const [searchCode, setSearchCode] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
   const formatPrice = (price: number) => {
@@ -24,11 +23,8 @@ export function CartModal({ isOpen, onClose, onCheckout, onSearchOrder }: CartMo
   };
 
   const handleSearchSubmit = () => {
-    if (searchCode.trim()) {
-      onSearchOrder(searchCode.trim().toUpperCase());
-      setSearchCode('');
-      setShowSearch(false);
-    }
+    onSearchOrder();
+    setShowSearch(false);
   };
 
   if (state.items.length === 0 && !showSearch) {
@@ -53,7 +49,7 @@ export function CartModal({ isOpen, onClose, onCheckout, onSearchOrder }: CartMo
             
             <div className="space-y-3">
               <Button 
-                onClick={() => setShowSearch(true)}
+                onClick={handleSearchSubmit}
                 variant="outline"
                 className="w-full"
               >
@@ -85,16 +81,9 @@ export function CartModal({ isOpen, onClose, onCheckout, onSearchOrder }: CartMo
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Código do Pedido</label>
-              <Input
-                value={searchCode}
-                onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
-                placeholder="Ex: 89BS93"
-                className="mt-1"
-                maxLength={6}
-              />
-            </div>
+            <p className="text-center text-muted-foreground">
+              Clique no botão abaixo para abrir a busca de pedidos
+            </p>
             
             <div className="flex gap-2">
               <Button 
@@ -107,9 +96,8 @@ export function CartModal({ isOpen, onClose, onCheckout, onSearchOrder }: CartMo
               <Button 
                 onClick={handleSearchSubmit}
                 className="flex-1 gradient-primary text-primary-foreground"
-                disabled={!searchCode.trim()}
               >
-                Buscar
+                Abrir Busca
               </Button>
             </div>
           </div>

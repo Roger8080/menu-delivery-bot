@@ -81,12 +81,9 @@ const Index = () => {
     setShowCart(true);
   };
 
-  const handleOrderSearch = (code: string) => {
+  const handleOrderSearch = () => {
     setShowCart(false);
-    toast({
-      title: 'Busca de pedido',
-      description: `Buscando pedido com código: ${code}`,
-    });
+    setShowOrderSearch(true);
   };
 
   if (loading) {

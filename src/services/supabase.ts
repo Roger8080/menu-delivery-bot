@@ -187,39 +187,57 @@ export async function saveOrder(order: Order): Promise<boolean> {
 // Buscar pedido por código do carrinho
 export async function fetchOrderByCartCode(cartCode: string): Promise<OrderProduct[]> {
   try {
-    const { data, error } = await supabase
+    // Buscar produtos vendidos
+    const { data: produtosVendidos, error: produtosError } = await supabase
       .from('produtos_vendidos')
       .select('*')
       .eq('carrinho', cartCode);
       
-    if (error) {
-      console.error('Erro ao buscar pedido por código:', error);
+    if (produtosError) {
+      console.error('Erro ao buscar produtos vendidos:', produtosError);
       return [];
     }
-    
-    return data.map(row => ({
-      id: row.id,
-      id_produtos_vendidos: row.id_produtos_vendidos,
-      id_pedido: row.id_pedido,
-      id_produto: row.id_produto,
-      id_condimento: row.id_condimento,
-      titulo: row.titulo,
-      descricao: row.descricao || '',
-      valor: parseFloat(row.valor?.toString() || '0'),
-      categoria: row.categoria,
-      condimentos_selecionados: row.condimentos_selecionados || '',
-      valor_condimentos: parseFloat(row.valor_condimentos?.toString() || '0'),
-      nome_usuario: row.nome_usuario,
-      cep: row.cep,
-      logradouro: row.logradouro,
-      numero: row.numero,
-      cidade: row.cidade,
-      bairro: row.bairro,
-      telefone: row.telefone,
-      tipo_pagamento: row.tipo_pagamento,
-      carrinho: row.carrinho,
-      data_pedido: row.data_pedido,
-      aprovado: row.aprovado as 'sim' | 'não'
+
+    if (!produtosVendidos || produtosVendidos.length === 0) {
+      return [];
+    }
+
+    // Buscar dados do pedido
+    const { data: pedidoData, error: pedidoError } = await supabase
+      .from('pedidos')
+      .select('*')
+      .eq('carrinho', cartCode)
+      .single();
+      
+    if (pedidoError) {
+      console.error('Erro ao buscar pedido:', pedidoError);
+      return [];
+    }
+
+    // Combinar os dados
+    return produtosVendidos.map((item: any) => ({
+      id: item.id,
+      id_produtos_vendidos: item.id_produtos_vendidos,
+      id_pedido: item.id_pedido,
+      id_produto: item.id_produto,
+      id_condimento: item.id_condimento,
+      titulo: 'Produto', // Será preenchido depois se necessário
+      descricao: '',
+      valor: parseFloat(item.valor_item?.toString() || '0'),
+      categoria: '',
+      condimentos_selecionados: '',
+      valor_condimentos: parseFloat(item.valor_item?.toString() || '0'),
+      nome_usuario: pedidoData.nome_usuario,
+      cep: pedidoData.cep,
+      logradouro: pedidoData.logradouro,
+      numero: pedidoData.numero,
+      cidade: pedidoData.cidade,
+      bairro: pedidoData.bairro,
+      telefone: pedidoData.telefone,
+      tipo_pagamento: pedidoData.tipo_pagamento,
+      carrinho: item.carrinho,
+      data_pedido: pedidoData.data_pedido,
+      aprovado: pedidoData.aprovado as 'sim' | 'não'
     }));
   } catch (error) {
     console.error('Erro ao buscar pedido por código:', error);
