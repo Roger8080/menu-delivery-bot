@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { CustomerData, Order } from '@/types';
 import { useCart } from '@/contexts/CartContext';
 import { sendToWhatsApp } from '@/services/whatsapp';
-import { generateCartCode, saveOrder } from '@/services/googleSheets';
+import { generateCartCode, saveOrder } from '@/services/supabase';
 import { ChevronLeft, MessageCircle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';

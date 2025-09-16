@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Product, Category } from '@/types';
-import { fetchProducts } from '@/services/googleSheets';
+import { fetchProducts } from '@/services/supabase';
 import { CartProvider } from '@/contexts/CartContext';
 import { Header } from '@/components/Header';
 import { CategoryTabs } from '@/components/CategoryTabs';

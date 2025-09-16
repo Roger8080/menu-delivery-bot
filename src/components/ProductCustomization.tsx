@@ -6,7 +6,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Minus, Plus, X } from 'lucide-react';
-import { fetchCondimentsForProduct } from '@/services/googleSheets';
+import { fetchCondimentsForProduct } from '@/services/supabase';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 

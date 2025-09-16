@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { X, Search, Printer, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { fetchOrderByCartCode, updateOrderApproval } from '@/services/googleSheets';
+import { fetchOrderByCartCode, updateOrderApproval } from '@/services/supabase';
 import { OrderProduct } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
