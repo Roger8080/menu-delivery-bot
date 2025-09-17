@@ -127,8 +127,7 @@ export async function saveOrder(order: Order): Promise<boolean> {
         telefone: order.customer.telefone,
         tipo_pagamento: order.customer.tipo_pagamento,
         carrinho: order.carrinho,
-        data_pedido: order.data_pedido,
-        aprovado: order.aprovado
+        aprovado: 'não' // Define como não aprovado inicialmente
       })
       .select();
 
@@ -137,42 +136,50 @@ export async function saveOrder(order: Order): Promise<boolean> {
       return false;
     }
 
-    // Salvar produtos vendidos
+    // Preparar registros para produtos_vendidos
+    const produtosVendidosRecords = [];
+    let recordIndex = 0;
+
+    // Para cada item do carrinho
     for (const item of order.items) {
-      const condimentosTexto = item.selectedCondiments
-        .map(c => `${c.nome_condimento} (+R$ ${c.valor_adicional.toFixed(2)})`)
-        .join(', ');
-
-      const valorCondimentos = item.selectedCondiments
-        .reduce((sum, c) => sum + c.valor_adicional, 0);
-
-      const { error: produtoError } = await supabase
-        .from('produtos_vendidos')
-        .insert({
-          id_produtos_vendidos: `${order.id_pedido}_${item.product.id_produto}_${Date.now()}`,
+      // Para cada quantidade do item
+      for (let qty = 1; qty <= item.quantity; qty++) {
+        // Salvar registro do produto base
+        recordIndex++;
+        produtosVendidosRecords.push({
+          id_produtos_vendidos: `${order.id_pedido}_${item.product.id_produto}_${Date.now()}_${recordIndex}`,
           id_pedido: order.id_pedido,
           id_produto: item.product.id_produto,
-          titulo: item.product.titulo,
-          descricao: item.product.descricao,
-          valor: item.product.valor,
-          categoria: item.product.categoria,
-          condimentos_selecionados: condimentosTexto,
-          valor_condimentos: valorCondimentos,
-          nome_usuario: order.customer.nome,
-          cep: order.customer.cep,
-          logradouro: order.customer.logradouro,
-          numero: order.customer.numero,
-          cidade: order.customer.cidade,
-          bairro: order.customer.bairro,
-          telefone: order.customer.telefone,
-          tipo_pagamento: order.customer.tipo_pagamento,
+          id_condimento: null, // null para produto base
+          valor_item: item.product.valor,
           carrinho: order.carrinho,
-          data_pedido: order.data_pedido,
           aprovado: 'não'
         });
 
-      if (produtoError) {
-        console.error('Erro ao salvar produto vendido:', produtoError);
+        // Salvar registro para cada condimento selecionado
+        for (const condiment of item.selectedCondiments) {
+          recordIndex++;
+          produtosVendidosRecords.push({
+            id_produtos_vendidos: `${order.id_pedido}_${item.product.id_produto}_${Date.now()}_${recordIndex}`,
+            id_pedido: order.id_pedido,
+            id_produto: item.product.id_produto,
+            id_condimento: condiment.id_condimento,
+            valor_item: condiment.valor_adicional,
+            carrinho: order.carrinho,
+            aprovado: 'não'
+          });
+        }
+      }
+    }
+
+    // Inserir todos os registros de uma vez
+    if (produtosVendidosRecords.length > 0) {
+      const { error: produtosError } = await supabase
+        .from('produtos_vendidos')
+        .insert(produtosVendidosRecords);
+
+      if (produtosError) {
+        console.error('Erro ao salvar produtos vendidos:', produtosError);
         return false;
       }
     }
