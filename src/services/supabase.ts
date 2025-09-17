@@ -138,50 +138,56 @@ export async function saveOrder(order: Order): Promise<boolean> {
 
     // Preparar registros para produtos_vendidos
     const produtosVendidosRecords = [];
-    let recordIndex = 0;
+    const timestamp = Date.now();
 
     // Para cada item do carrinho
     for (const item of order.items) {
       // Para cada quantidade do item
       for (let qty = 1; qty <= item.quantity; qty++) {
         // Salvar registro do produto base
-        recordIndex++;
+        const baseRecordId = `${order.id_pedido}_${item.product.id_produto}_${timestamp}_${qty}`;
         produtosVendidosRecords.push({
-          id_produtos_vendidos: `${order.id_pedido}_${item.product.id_produto}_${Date.now()}_${recordIndex}`,
+          id_produtos_vendidos: baseRecordId,
           id_pedido: order.id_pedido,
           id_produto: item.product.id_produto,
           id_condimento: null, // null para produto base
-          valor_item: item.product.valor,
+          valor_item: Number(item.product.valor), // Garantir que é number
           carrinho: order.carrinho,
           aprovado: 'não'
         });
 
         // Salvar registro para cada condimento selecionado
-        for (const condiment of item.selectedCondiments) {
-          recordIndex++;
+        item.selectedCondiments.forEach((condiment, condimentIndex) => {
+          const condimentRecordId = `${order.id_pedido}_${item.product.id_produto}_${timestamp}_${qty}_c${condimentIndex}`;
           produtosVendidosRecords.push({
-            id_produtos_vendidos: `${order.id_pedido}_${item.product.id_produto}_${Date.now()}_${recordIndex}`,
+            id_produtos_vendidos: condimentRecordId,
             id_pedido: order.id_pedido,
             id_produto: item.product.id_produto,
             id_condimento: condiment.id_condimento,
-            valor_item: condiment.valor_adicional,
+            valor_item: Number(condiment.valor_adicional), // Garantir que é number
             carrinho: order.carrinho,
             aprovado: 'não'
           });
-        }
+        });
       }
     }
 
     // Inserir todos os registros de uma vez
     if (produtosVendidosRecords.length > 0) {
-      const { error: produtosError } = await supabase
+      console.log('Tentando inserir produtos vendidos:', produtosVendidosRecords.length, 'registros');
+      
+      const { data, error: produtosError } = await supabase
         .from('produtos_vendidos')
-        .insert(produtosVendidosRecords);
+        .insert(produtosVendidosRecords)
+        .select();
 
       if (produtosError) {
         console.error('Erro ao salvar produtos vendidos:', produtosError);
+        console.error('Dados que tentamos inserir:', produtosVendidosRecords);
         return false;
       }
+      
+      console.log('Produtos vendidos salvos com sucesso:', data?.length, 'registros');
     }
 
     return true;
