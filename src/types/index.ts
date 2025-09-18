@@ -79,6 +79,7 @@ export interface OrderProduct {
   cep: string;
   logradouro: string;
   numero: string;
+  complemento?: string;
   cidade: string;
   bairro: string;
   telefone: string;

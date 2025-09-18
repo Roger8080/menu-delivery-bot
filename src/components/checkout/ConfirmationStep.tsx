@@ -16,10 +16,10 @@ interface ConfirmationStepProps {
 }
 
 export function ConfirmationStep({ customerData, onPrevious, onComplete }: ConfirmationStepProps) {
-  const { state, clearCart } = useCart();
+  const { state, clearCart, clearEditingOrder } = useCart();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [cartCode] = useState(generateCartCode());
+  const [cartCode] = useState(state.editingOrderCode || generateCartCode());
 
   const formatPrice = (price: number) => {
     return `R$ ${price.toFixed(2).replace('.', ',')}`;
@@ -29,9 +29,11 @@ export function ConfirmationStep({ customerData, onPrevious, onComplete }: Confi
     setLoading(true);
     
     try {
+      const isEditing = !!state.editingOrderCode;
+      
       // Criar objeto do pedido
       const order: Order = {
-        id_pedido: Date.now().toString(),
+        id_pedido: isEditing ? state.editingOrderCode! : Date.now().toString(),
         customer: customerData,
         items: state.items,
         total: state.totalPrice,
@@ -40,13 +42,19 @@ export function ConfirmationStep({ customerData, onPrevious, onComplete }: Confi
         aprovado: ''
       };
 
-      // Salvar pedido na planilha (simulado)
-      await saveOrder(order);
+      // Salvar ou atualizar pedido
+      const success = await saveOrder(order);
+      
+      if (!success) {
+        throw new Error('Falha ao salvar pedido');
+      }
 
       // Enviar para WhatsApp
       sendToWhatsApp(order);
 
-      // Limpar carrinho
+      // Limpar carrinho e estado de edição
+      clearCart();
+      clearEditingOrder();
       clearCart();
 
       toast({

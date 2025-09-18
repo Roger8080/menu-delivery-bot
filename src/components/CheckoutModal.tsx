@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Edit } from 'lucide-react';
 import { CustomerData } from '@/types';
 import { AddressStep } from './checkout/AddressStep';
 import { PersonalDataStep } from './checkout/PersonalDataStep';
 import { PaymentStep } from './checkout/PaymentStep';
 import { ConfirmationStep } from './checkout/ConfirmationStep';
+import { useCart } from '@/contexts/CartContext';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -16,6 +17,14 @@ interface CheckoutModalProps {
 export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [customerData, setCustomerData] = useState<Partial<CustomerData>>({});
+  const { state } = useCart();
+
+  // Pré-preencher dados do cliente quando estiver editando um pedido
+  useEffect(() => {
+    if (state.editingOrderCode && state.customerData) {
+      setCustomerData(state.customerData);
+    }
+  }, [state.editingOrderCode, state.customerData]);
 
   const steps = [
     { number: 1, title: 'Endereço', completed: false },
@@ -44,7 +53,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
   const handleClose = () => {
     setCurrentStep(1);
-    setCustomerData({});
+    if (!state.editingOrderCode) {
+      setCustomerData({});
+    }
     onClose();
   };
 
@@ -54,6 +65,12 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         {/* Header com progresso */}
         <div className="flex justify-between items-center pb-4 border-b">
           <div className="flex items-center gap-2">
+            {state.editingOrderCode && (
+              <div className="flex items-center gap-2 mr-4 px-3 py-1 bg-primary/10 text-primary rounded-md">
+                <Edit className="h-4 w-4" />
+                <span className="text-sm font-medium">Editando: {state.editingOrderCode}</span>
+              </div>
+            )}
             {steps.map((step, index) => (
               <div key={step.number} className="flex items-center">
                 <div 

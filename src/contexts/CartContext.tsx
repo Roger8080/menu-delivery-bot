@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { CartItem, Product, SelectedCondiment } from '@/types';
+import { CartItem, Product, SelectedCondiment, CustomerData } from '@/types';
 
 interface CartState {
   items: CartItem[];
   totalItems: number;
   totalPrice: number;
+  editingOrderCode?: string;
+  customerData?: CustomerData;
 }
 
 type CartAction =
@@ -12,7 +14,9 @@ type CartAction =
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'UPDATE_QUANTITY'; payload: { itemId: string; quantity: number } }
   | { type: 'CLEAR_CART' }
-  | { type: 'LOAD_CART'; payload: CartItem[] };
+  | { type: 'LOAD_CART'; payload: CartItem[] }
+  | { type: 'SET_EDITING_ORDER'; payload: { orderCode: string; customerData: CustomerData; items: CartItem[] } }
+  | { type: 'CLEAR_EDITING_ORDER' };
 
 const initialState: CartState = {
   items: [],
@@ -120,6 +124,25 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       };
     }
 
+    case 'SET_EDITING_ORDER': {
+      const { orderCode, customerData, items } = action.payload;
+      const totals = calculateCartTotals(items);
+      return {
+        items,
+        editingOrderCode: orderCode,
+        customerData,
+        ...totals,
+      };
+    }
+
+    case 'CLEAR_EDITING_ORDER': {
+      return {
+        ...state,
+        editingOrderCode: undefined,
+        customerData: undefined,
+      };
+    }
+
     default:
       return state;
   }
@@ -132,6 +155,8 @@ interface CartContextType {
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
   loadCart: (items: CartItem[]) => void;
+  setEditingOrder: (orderCode: string, customerData: CustomerData, items: CartItem[]) => void;
+  clearEditingOrder: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -159,8 +184,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'LOAD_CART', payload: items });
   };
 
+  const setEditingOrder = (orderCode: string, customerData: CustomerData, items: CartItem[]) => {
+    dispatch({ type: 'SET_EDITING_ORDER', payload: { orderCode, customerData, items } });
+  };
+
+  const clearEditingOrder = () => {
+    dispatch({ type: 'CLEAR_EDITING_ORDER' });
+  };
+
   return (
-    <CartContext.Provider value={{ state, addItem, removeItem, updateQuantity, clearCart, loadCart }}>
+    <CartContext.Provider value={{ state, addItem, removeItem, updateQuantity, clearCart, loadCart, setEditingOrder, clearEditingOrder }}>
       {children}
     </CartContext.Provider>
   );

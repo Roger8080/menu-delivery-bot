@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { X, Search, Printer, CheckCircle, XCircle, Loader2, Edit, ShoppingCart } from 'lucide-react';
 import { fetchOrderByCartCode, updateOrderApproval, reconstructCartFromOrder } from '@/services/supabase';
-import { OrderProduct } from '@/types';
+import { OrderProduct, CustomerData } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/contexts/CartContext';
 import { ThermalPrintTemplate } from './ThermalPrintTemplate';
@@ -42,7 +42,7 @@ export function OrderSearchModal({ isOpen, onClose, onEditOrder }: OrderSearchMo
   const [showResults, setShowResults] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const { toast } = useToast();
-  const { loadCart } = useCart();
+  const { loadCart, setEditingOrder } = useCart();
 
   const formatPrice = (price: number) => {
     return `R$ ${price.toFixed(2).replace('.', ',')}`;
@@ -158,7 +158,22 @@ export function OrderSearchModal({ isOpen, onClose, onEditOrder }: OrderSearchMo
         return;
       }
 
-      loadCart(cartItems);
+      // Criar dados do cliente a partir dos dados do pedido
+      const orderCustomerData: CustomerData = {
+        nome: customerData.nome_usuario,
+        telefone: customerData.telefone,
+        cep: customerData.cep,
+        logradouro: customerData.logradouro,
+        numero: customerData.numero,
+        complemento: customerData.complemento,
+        cidade: customerData.cidade,
+        bairro: customerData.bairro,
+        tipo_pagamento: customerData.tipo_pagamento as CustomerData['tipo_pagamento']
+      };
+
+      // Usar setEditingOrder para preservar código do carrinho e dados do cliente
+      setEditingOrder(customerData.carrinho, orderCustomerData, cartItems);
+      
       toast({
         title: 'Carrinho carregado!',
         description: 'O pedido foi carregado no carrinho para edição.',

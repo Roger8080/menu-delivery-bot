@@ -427,3 +427,91 @@ export async function updateOrderApproval(cartCode: string, approved: 'sim' | 'n
     return false;
   }
 }
+
+export async function updateOrder(order: Order): Promise<boolean> {
+  try {
+    // Atualizar dados do cliente na tabela pedidos
+    const { error: pedidosError } = await supabase
+      .from('pedidos')
+      .update({
+        nome_usuario: order.customer.nome,
+        telefone: order.customer.telefone,
+        cep: order.customer.cep,
+        logradouro: order.customer.logradouro,
+        numero: order.customer.numero,
+        complemento: order.customer.complemento || null,
+        cidade: order.customer.cidade,
+        bairro: order.customer.bairro,
+        tipo_pagamento: order.customer.tipo_pagamento,
+        aprovado: order.aprovado
+      })
+      .eq('carrinho', order.carrinho);
+
+    if (pedidosError) {
+      console.error('Erro ao atualizar pedido:', pedidosError);
+      return false;
+    }
+
+    // Remover todos os produtos vendidos existentes deste carrinho
+    const { error: deleteError } = await supabase
+      .from('produtos_vendidos')
+      .delete()
+      .eq('carrinho', order.carrinho);
+
+    if (deleteError) {
+      console.error('Erro ao remover produtos vendidos antigos:', deleteError);
+      return false;
+    }
+
+    // Inserir novos produtos vendidos
+    const produtosVendidos = order.items.flatMap(item => {
+      const baseProduct = {
+        id_produtos_vendidos: `${order.id_pedido}-${item.product.id_produto}`,
+        id_pedido: order.id_pedido,
+        id_produto: item.product.id_produto,
+        id_condimento: null as string | null,
+        carrinho: order.carrinho,
+        aprovado: order.aprovado,
+        valor_item: item.product.valor * item.quantity
+      };
+
+      const products = [baseProduct];
+
+      // Adicionar condimentos como produtos vendidos separados
+      item.selectedCondiments.forEach(condiment => {
+        products.push({
+          id_produtos_vendidos: `${order.id_pedido}-${item.product.id_produto}-${condiment.id_condimento}`,
+          id_pedido: order.id_pedido,
+          id_produto: item.product.id_produto,
+          id_condimento: condiment.id_condimento,
+          carrinho: order.carrinho,
+          aprovado: order.aprovado,
+          valor_item: condiment.valor_adicional * item.quantity
+        });
+      });
+
+      return products;
+    });
+
+    for (const produto of produtosVendidos) {
+      const { error: insertError } = await supabase
+        .from('produtos_vendidos')
+        .insert(produto);
+
+      if (insertError) {
+        console.error('Erro ao inserir produto vendido:', insertError);
+        return false;
+      }
+    }
+
+    if (insertError) {
+      console.error('Erro ao inserir produtos vendidos atualizados:', insertError);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Erro ao atualizar pedido:', error);
+    return false;
+  }
+}
