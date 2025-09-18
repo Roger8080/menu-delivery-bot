@@ -52,8 +52,8 @@ export function OrderSearchModal({ isOpen, onClose, onEditOrder }: OrderSearchMo
     const grouped = new Map<string, GroupedOrderItem>();
 
     orderProducts.forEach(item => {
-      if (item.id_condimento === '' || item.id_condimento === '0') {
-        // Item base do produto
+      if (!item.id_condimento || item.id_condimento === null) {
+        // Item base do produto (id_condimento é null)
         if (!grouped.has(item.id_produto)) {
           grouped.set(item.id_produto, {
             product: {
@@ -64,15 +64,37 @@ export function OrderSearchModal({ isOpen, onClose, onEditOrder }: OrderSearchMo
               categoria: item.categoria,
             },
             condiments: [],
-            totalPrice: item.valor,
+            totalPrice: item.valor_condimentos || item.valor,
           });
+        } else {
+          // Se já existe, adicionar o valor do produto base
+          const existingItem = grouped.get(item.id_produto);
+          if (existingItem) {
+            existingItem.totalPrice += item.valor_condimentos || item.valor;
+          }
         }
       } else {
         // Condimento do produto
-        const existingItem = grouped.get(item.id_produto);
+        let existingItem = grouped.get(item.id_produto);
+        if (!existingItem) {
+          // Se ainda não existe o produto base, criar entrada básica
+          grouped.set(item.id_produto, {
+            product: {
+              id_produto: item.id_produto,
+              titulo: item.titulo,
+              descricao: item.descricao,
+              valor: item.valor,
+              categoria: item.categoria,
+            },
+            condiments: [],
+            totalPrice: 0,
+          });
+          existingItem = grouped.get(item.id_produto);
+        }
+        
         if (existingItem) {
           existingItem.condiments.push({
-            id_condimento: item.id_condimento || '',
+            id_condimento: item.id_condimento,
             nome_condimento: item.condimentos_selecionados || 'Condimento',
             valor_adicional: item.valor_condimentos || 0,
           });

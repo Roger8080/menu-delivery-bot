@@ -227,31 +227,60 @@ export async function fetchOrderByCartCode(cartCode: string): Promise<OrderProdu
       return [];
     }
 
-    // Combinar os dados
-    return produtosVendidos.map((item: any) => ({
-      id: item.id,
-      id_produtos_vendidos: item.id_produtos_vendidos,
-      id_pedido: item.id_pedido,
-      id_produto: item.id_produto,
-      id_condimento: item.id_condimento,
-      titulo: 'Produto', // Será preenchido depois se necessário
-      descricao: '',
-      valor: parseFloat(item.valor_item?.toString() || '0'),
-      categoria: '',
-      condimentos_selecionados: '',
-      valor_condimentos: parseFloat(item.valor_item?.toString() || '0'),
-      nome_usuario: pedidoData.nome_usuario,
-      cep: pedidoData.cep,
-      logradouro: pedidoData.logradouro,
-      numero: pedidoData.numero,
-      cidade: pedidoData.cidade,
-      bairro: pedidoData.bairro,
-      telefone: pedidoData.telefone,
-      tipo_pagamento: pedidoData.tipo_pagamento,
-      carrinho: item.carrinho,
-      data_pedido: pedidoData.data_pedido,
-      aprovado: pedidoData.aprovado as 'sim' | 'não'
-    }));
+    // Buscar dados dos produtos
+    const productIds = [...new Set(produtosVendidos.map(item => item.id_produto))];
+    const { data: products, error: productsError } = await supabase
+      .from('produtos')
+      .select('*')
+      .in('id_produto', productIds);
+
+    if (productsError) {
+      console.error('Erro ao buscar produtos:', productsError);
+      return [];
+    }
+
+    // Buscar dados dos condimentos
+    const condimentIds = [...new Set(produtosVendidos.map(item => item.id_condimento).filter(Boolean))];
+    const { data: condiments, error: condimentsError } = await supabase
+      .from('condimentos')
+      .select('*')
+      .in('id_condimento', condimentIds);
+
+    if (condimentsError) {
+      console.error('Erro ao buscar condimentos:', condimentsError);
+      return [];
+    }
+
+    // Combinar os dados enriquecidos
+    return produtosVendidos.map((item: any) => {
+      const product = products?.find(p => p.id_produto === item.id_produto);
+      const condiment = item.id_condimento ? condiments?.find(c => c.id_condimento === item.id_condimento) : null;
+
+      return {
+        id: item.id,
+        id_produtos_vendidos: item.id_produtos_vendidos,
+        id_pedido: item.id_pedido,
+        id_produto: item.id_produto,
+        id_condimento: item.id_condimento,
+        titulo: product?.titulo || 'Produto',
+        descricao: product?.descricao || '',
+        valor: parseFloat(product?.valor?.toString() || '0'),
+        categoria: product?.categoria || '',
+        condimentos_selecionados: condiment?.nome_condimento || '',
+        valor_condimentos: parseFloat(item.valor_item?.toString() || '0'),
+        nome_usuario: pedidoData.nome_usuario,
+        cep: pedidoData.cep,
+        logradouro: pedidoData.logradouro,
+        numero: pedidoData.numero,
+        cidade: pedidoData.cidade,
+        bairro: pedidoData.bairro,
+        telefone: pedidoData.telefone,
+        tipo_pagamento: pedidoData.tipo_pagamento,
+        carrinho: item.carrinho,
+        data_pedido: pedidoData.data_pedido,
+        aprovado: pedidoData.aprovado as 'sim' | 'não'
+      };
+    });
   } catch (error) {
     console.error('Erro ao buscar pedido por código:', error);
     return [];
