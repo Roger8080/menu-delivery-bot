@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { CustomerData, Order } from '@/types';
 import { useCart } from '@/contexts/CartContext';
 import { sendToWhatsApp } from '@/services/whatsapp';
-import { generateCartCode, saveOrder } from '@/services/supabase';
+import { generateCartCode, saveOrder, updateOrder } from '@/services/supabase';
 import { ChevronLeft, MessageCircle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
@@ -13,9 +13,10 @@ interface ConfirmationStepProps {
   customerData: CustomerData;
   onPrevious: () => void;
   onComplete: () => void;
+  onEditComplete?: () => void;
 }
 
-export function ConfirmationStep({ customerData, onPrevious, onComplete }: ConfirmationStepProps) {
+export function ConfirmationStep({ customerData, onPrevious, onComplete, onEditComplete }: ConfirmationStepProps) {
   const { state, clearCart, clearEditingOrder } = useCart();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -33,7 +34,7 @@ export function ConfirmationStep({ customerData, onPrevious, onComplete }: Confi
       
       // Criar objeto do pedido
       const order: Order = {
-        id_pedido: isEditing ? state.editingOrderCode! : Date.now().toString(),
+        id_pedido: isEditing ? state.editingOrderCode! : generateCartCode(),
         customer: customerData,
         items: state.items,
         total: state.totalPrice,
@@ -43,26 +44,37 @@ export function ConfirmationStep({ customerData, onPrevious, onComplete }: Confi
       };
 
       // Salvar ou atualizar pedido
-      const success = await saveOrder(order);
+      const success = isEditing ? await updateOrder(order) : await saveOrder(order);
       
       if (!success) {
-        throw new Error('Falha ao salvar pedido');
+        throw new Error(isEditing ? 'Falha ao atualizar pedido' : 'Falha ao salvar pedido');
       }
 
-      // Enviar para WhatsApp
-      sendToWhatsApp(order);
+      if (isEditing) {
+        // Se está editando, não envia WhatsApp e retorna para OrderSearchModal
+        clearCart();
+        clearEditingOrder();
 
-      // Limpar carrinho e estado de edição
-      clearCart();
-      clearEditingOrder();
-      clearCart();
+        toast({
+          title: 'Pedido atualizado!',
+          description: `Pedido #${cartCode} foi atualizado com sucesso.`,
+        });
 
-      toast({
-        title: 'Pedido enviado!',
-        description: `Seu pedido #${cartCode} foi enviado para a pizzaria via WhatsApp.`,
-      });
+        onEditComplete?.();
+      } else {
+        // Se é novo pedido, envia WhatsApp normalmente
+        sendToWhatsApp(order);
 
-      onComplete();
+        clearCart();
+        clearEditingOrder();
+
+        toast({
+          title: 'Pedido enviado!',
+          description: `Seu pedido #${cartCode} foi enviado para a pizzaria via WhatsApp.`,
+        });
+
+        onComplete();
+      }
     } catch (error) {
       console.error('Erro ao finalizar pedido:', error);
       toast({
@@ -167,6 +179,11 @@ export function ConfirmationStep({ customerData, onPrevious, onComplete }: Confi
         >
           {loading ? (
             <>Finalizando...</>
+          ) : state.editingOrderCode ? (
+            <>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Confirmar Alterações
+            </>
           ) : (
             <>
               <MessageCircle className="h-4 w-4 mr-2" />
@@ -176,9 +193,11 @@ export function ConfirmationStep({ customerData, onPrevious, onComplete }: Confi
         </Button>
       </div>
 
-      <div className="text-center text-xs text-muted-foreground">
-        Ao finalizar, você será redirecionado para o WhatsApp da pizzaria
-      </div>
+      {!state.editingOrderCode && (
+        <div className="text-center text-xs text-muted-foreground">
+          Ao finalizar, você será redirecionado para o WhatsApp da pizzaria
+        </div>
+      )}
     </div>
   );
 }

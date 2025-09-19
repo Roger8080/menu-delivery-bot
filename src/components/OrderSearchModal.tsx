@@ -16,6 +16,7 @@ interface OrderSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEditOrder?: () => void;
+  refreshOrder?: () => void;
 }
 
 interface GroupedOrderItem {
@@ -34,7 +35,7 @@ interface GroupedOrderItem {
   totalPrice: number;
 }
 
-export function OrderSearchModal({ isOpen, onClose, onEditOrder }: OrderSearchModalProps) {
+export function OrderSearchModal({ isOpen, onClose, onEditOrder, refreshOrder }: OrderSearchModalProps) {
   const [searchCode, setSearchCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [orderData, setOrderData] = useState<OrderProduct[]>([]);

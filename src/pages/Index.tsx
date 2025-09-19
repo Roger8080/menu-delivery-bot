@@ -81,6 +81,11 @@ const Index = () => {
     setShowCart(true);
   };
 
+  const handleEditComplete = () => {
+    setShowCheckout(false);
+    setShowOrderSearch(true);
+  };
+
   const handleOrderSearch = () => {
     setShowCart(false);
     setShowOrderSearch(true);
@@ -154,6 +159,7 @@ const Index = () => {
         <CheckoutModal
           isOpen={showCheckout}
           onClose={() => setShowCheckout(false)}
+          onEditComplete={handleEditComplete}
         />
 
         <OrderSearchModal

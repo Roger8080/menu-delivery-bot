@@ -12,9 +12,10 @@ import { useCart } from '@/contexts/CartContext';
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onEditComplete?: () => void;
 }
 
-export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, onEditComplete }: CheckoutModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [customerData, setCustomerData] = useState<Partial<CustomerData>>({});
   const { state } = useCart();
@@ -49,6 +50,13 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     setCurrentStep(1);
     setCustomerData({});
     onClose();
+  };
+
+  const handleEditComplete = () => {
+    setCurrentStep(1);
+    setCustomerData({});
+    onClose();
+    onEditComplete?.();
   };
 
   const handleClose = () => {
@@ -133,6 +141,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               customerData={customerData as CustomerData}
               onPrevious={previousStep}
               onComplete={handleComplete}
+              onEditComplete={handleEditComplete}
             />
           )}
         </div>
