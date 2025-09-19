@@ -463,50 +463,52 @@ export async function updateOrder(order: Order): Promise<boolean> {
       return false;
     }
 
-    // Inserir novos produtos vendidos
-    const produtosVendidos = order.items.flatMap(item => {
-      const baseProduct = {
-        id_produtos_vendidos: `${order.id_pedido}-${item.product.id_produto}`,
-        id_pedido: order.id_pedido,
-        id_produto: item.product.id_produto,
-        id_condimento: null as string | null,
-        carrinho: order.carrinho,
-        aprovado: order.aprovado,
-        valor_item: item.product.valor * item.quantity
-      };
+    // Preparar registros para produtos_vendidos
+    const produtosVendidosRecords = [];
+    const timestamp = Date.now();
 
-      const products = [baseProduct];
-
-      // Adicionar condimentos como produtos vendidos separados
-      item.selectedCondiments.forEach(condiment => {
-        products.push({
-          id_produtos_vendidos: `${order.id_pedido}-${item.product.id_produto}-${condiment.id_condimento}`,
+    // Para cada item do carrinho
+    for (const item of order.items) {
+      // Para cada quantidade do item
+      for (let qty = 1; qty <= item.quantity; qty++) {
+        // Salvar registro do produto base
+        const baseRecordId = `${order.id_pedido}_${item.product.id_produto}_${timestamp}_${qty}`;
+        produtosVendidosRecords.push({
+          id_produtos_vendidos: baseRecordId,
           id_pedido: order.id_pedido,
           id_produto: item.product.id_produto,
-          id_condimento: condiment.id_condimento,
+          id_condimento: null,
+          valor_item: Number(item.product.valor),
           carrinho: order.carrinho,
-          aprovado: order.aprovado,
-          valor_item: condiment.valor_adicional * item.quantity
+          aprovado: order.aprovado
         });
-      });
 
-      return products;
-    });
-
-    for (const produto of produtosVendidos) {
-      const { error: insertError } = await supabase
-        .from('produtos_vendidos')
-        .insert(produto);
-
-      if (insertError) {
-        console.error('Erro ao inserir produto vendido:', insertError);
-        return false;
+        // Salvar registro para cada condimento selecionado
+        item.selectedCondiments.forEach((condiment, condimentIndex) => {
+          const condimentRecordId = `${order.id_pedido}_${item.product.id_produto}_${timestamp}_${qty}_c${condimentIndex}`;
+          produtosVendidosRecords.push({
+            id_produtos_vendidos: condimentRecordId,
+            id_pedido: order.id_pedido,
+            id_produto: item.product.id_produto,
+            id_condimento: condiment.id_condimento,
+            valor_item: Number(condiment.valor_adicional),
+            carrinho: order.carrinho,
+            aprovado: order.aprovado
+          });
+        });
       }
     }
 
-    if (insertError) {
-      console.error('Erro ao inserir produtos vendidos atualizados:', insertError);
-      return false;
+    // Inserir todos os registros de uma vez
+    if (produtosVendidosRecords.length > 0) {
+      const { error: produtosError } = await supabase
+        .from('produtos_vendidos')
+        .insert(produtosVendidosRecords);
+
+      if (produtosError) {
+        console.error('Erro ao inserir produtos vendidos atualizados:', produtosError);
+        return false;
+      }
     }
 
     return true;
