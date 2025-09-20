@@ -53,13 +53,18 @@ export function OrderSearchModal({ isOpen, onClose, onEditOrder, refreshOrder }:
     const grouped = new Map<string, GroupedOrderItem>();
 
     orderProducts.forEach(item => {
+      // Extrair o número da unidade do id_produtos_vendidos
+      const unitMatch = item.id_produtos_vendidos.match(/_(\d+)$/);
+      const unitNumber = unitMatch ? unitMatch[1] : '1';
+      const groupKey = `${item.id_produto}_unit_${unitNumber}`;
+
       if (!item.id_condimento || item.id_condimento === null) {
         // Item base do produto (id_condimento é null)
-        if (!grouped.has(item.id_produto)) {
-          grouped.set(item.id_produto, {
+        if (!grouped.has(groupKey)) {
+          grouped.set(groupKey, {
             product: {
               id_produto: item.id_produto,
-              titulo: item.titulo,
+              titulo: `${item.titulo} (Unidade ${unitNumber})`,
               descricao: item.descricao,
               valor: item.valor,
               categoria: item.categoria,
@@ -69,20 +74,20 @@ export function OrderSearchModal({ isOpen, onClose, onEditOrder, refreshOrder }:
           });
         } else {
           // Se já existe, adicionar o valor do produto base
-          const existingItem = grouped.get(item.id_produto);
+          const existingItem = grouped.get(groupKey);
           if (existingItem) {
             existingItem.totalPrice += item.valor_condimentos || item.valor;
           }
         }
       } else {
         // Condimento do produto
-        let existingItem = grouped.get(item.id_produto);
+        let existingItem = grouped.get(groupKey);
         if (!existingItem) {
           // Se ainda não existe o produto base, criar entrada básica
-          grouped.set(item.id_produto, {
+          grouped.set(groupKey, {
             product: {
               id_produto: item.id_produto,
-              titulo: item.titulo,
+              titulo: `${item.titulo} (Unidade ${unitNumber})`,
               descricao: item.descricao,
               valor: item.valor,
               categoria: item.categoria,
@@ -90,7 +95,7 @@ export function OrderSearchModal({ isOpen, onClose, onEditOrder, refreshOrder }:
             condiments: [],
             totalPrice: 0,
           });
-          existingItem = grouped.get(item.id_produto);
+          existingItem = grouped.get(groupKey);
         }
         
         if (existingItem) {

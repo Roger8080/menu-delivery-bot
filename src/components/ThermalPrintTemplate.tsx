@@ -32,13 +32,18 @@ export function ThermalPrintTemplate({ orderData, customerData, cartCode, totalO
     const grouped = new Map<string, GroupedOrderItem>();
 
     orderProducts.forEach(item => {
+      // Extrair o número da unidade do id_produtos_vendidos
+      const unitMatch = item.id_produtos_vendidos.match(/_(\d+)$/);
+      const unitNumber = unitMatch ? unitMatch[1] : '1';
+      const groupKey = `${item.id_produto}_unit_${unitNumber}`;
+
       if (item.id_condimento === '' || item.id_condimento === '0' || !item.id_condimento) {
         // Item base do produto
-        if (!grouped.has(item.id_produto)) {
-          grouped.set(item.id_produto, {
+        if (!grouped.has(groupKey)) {
+          grouped.set(groupKey, {
             product: {
               id_produto: item.id_produto,
-              titulo: item.titulo,
+              titulo: `${item.titulo} (Unidade ${unitNumber})`,
               descricao: item.descricao,
               valor: item.valor,
               categoria: item.categoria,
@@ -49,7 +54,7 @@ export function ThermalPrintTemplate({ orderData, customerData, cartCode, totalO
         }
       } else {
         // Condimento do produto
-        const existingItem = grouped.get(item.id_produto);
+        const existingItem = grouped.get(groupKey);
         if (existingItem) {
           existingItem.condiments.push({
             nome_condimento: item.condimentos_selecionados || 'Condimento',
